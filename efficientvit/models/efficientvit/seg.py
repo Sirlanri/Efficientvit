@@ -138,6 +138,21 @@ def efficientvit_seg_b0(dataset: str, **kwargs) -> EfficientViTSeg:
             n_classes=19,
             **build_kwargs_from_config(kwargs, SegHead),
         )
+    elif dataset == "tire6":
+        head = SegHead(
+            fid_list=["stage4", "stage3", "stage2"],
+            in_channel_list=[128, 64, 32],
+            stride_list=[32, 16, 8],
+            head_stride=8,
+            head_width=32,
+            head_depth=1,
+            expand_ratio=4,
+            middle_op="mbconv",
+            final_expand=4,
+            #轮胎6分类
+            n_classes=6,
+            **build_kwargs_from_config(kwargs, SegHead),
+        )
     else:
         raise NotImplementedError
     model = EfficientViTSeg(backbone, head)
