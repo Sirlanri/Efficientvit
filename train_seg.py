@@ -15,6 +15,18 @@ from efficientvit.seg_model_zoo import create_seg_model
 from sklearn.metrics import jaccard_score, accuracy_score
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
+# 参数区
+
+root_dir = r'E:\项目数据\轮胎\分割数据集\总数据集\分割格式'
+
+# 设置保存目录
+out_weights_path = r'assets\checkpoints\tire6'
+# 设置保存模型数量
+max_to_save = 200  # 只保存最后n轮训练的模型
+# 设置训练轮数
+epochs = 300
+# 定义用于保存loss的列表
+loss_list = []
 
 def compute_metrics(preds, labels, num_classes=6):
     preds_flat = preds.flatten()
@@ -93,29 +105,38 @@ class SemanticSegmentationDataset(Dataset):
 
         return encoded_inputs
 
-# 设置保存目录
-out_weights_path = r'assets\checkpoints\tire6'
-# 设置保存模型数量
-max_to_save = 3  # 只保存最后3轮训练的模型
-# 定义用于保存loss和iou的列表
-loss_list = []
-iou_list = []
+def load_checkpoint(model, checkpoint_dir, max_to_save=3):
+    """
+    从文件中加载最新一轮的模型，并维护保存列表
+    """
+    # 获取所有pth文件路径
+    checkpoint_files = [os.path.join(checkpoint_dir, f) for f in os.listdir(checkpoint_dir) if f.endswith('.pth')]
 
-def save_checkpoint(epoch, avg_val_loss, avg_val_iou, avg_val_accuracy, model):
+    # 按loss排序，并获取最新模型路径
+    if checkpoint_files:
+        checkpoint_files = sorted(checkpoint_files, key=lambda f: float(f.split('_')[2]))
+        latest_checkpoint_path = checkpoint_files[-1]
+        print(f"Loading checkpoint from {latest_checkpoint_path}")
+
+        # 加载模型
+        model.load_state_dict(torch.load(latest_checkpoint_path))
+
+    else:
+        print("No checkpoint found. Starting training from scratch.")
+
+def save_checkpoint(model, checkpoint_dir, epoch, avg_val_loss, max_to_save=3):
     """
     保存模型并维护保存列表
     """
     # 创建模型保存路径
-    model_save_path = os.path.join(out_weights_path, f'model_epoch_{epoch}_loss_{avg_val_loss:.4f}_IoU_{avg_val_iou:.4f}_accuracy_{avg_val_accuracy:.4f}.pth')
+    model_save_path = os.path.join(checkpoint_dir, f'model_epoch_{epoch}_loss_{avg_val_loss:.4f}_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.pth')
 
     # 保存模型
     torch.save(model.state_dict(), model_save_path)
     print(f"Model saved to {model_save_path}")
-    print("Epoch finished:", epoch)
 
-    # 更新loss和iou列表
+    # 更新loss列表
     loss_list.append(avg_val_loss)
-    iou_list.append(avg_val_iou)
 
     # 删除旧的模型，只保留最新的max_to_save个模型
     if len(loss_list) > max_to_save:
@@ -123,12 +144,9 @@ def save_checkpoint(epoch, avg_val_loss, avg_val_iou, avg_val_accuracy, model):
         max_loss_index = loss_list.index(max(loss_list))
 
         # 删除loss最大的模型
-        loss_path = os.path.join(out_weights_path, f'model_epoch_{loss_list.index(max(loss_list))}_loss_{loss_list[max_loss_index]:.4f}_IoU_{iou_list[max_loss_index]:.4f}_accuracy_{avg_val_accuracy:.4f}.pth')
+        loss_path = os.path.join(checkpoint_dir, f'model_epoch_{loss_list.index(max(loss_list))}_loss_{loss_list[max_loss_index]:.4f}.pth')
         os.remove(loss_path)
 
-        # 删除loss最大的模型对应的iou记录
-        del loss_list[max_loss_index]
-        del iou_list[max_loss_index]
 
 if __name__ == "__main__":
 
@@ -144,7 +162,6 @@ if __name__ == "__main__":
     images are simple images nothing special :D
     annotations are images, for each pixel is the class id segment. so if we have just 3 segemntation classes, the values in the image should be just 0 1 and 2  
     '''
-    root_dir = r'E:\项目数据\轮胎\分割数据集\总数据集\分割格式' # The dataset format is
 
     image_processor = SegformerImageProcessor(reduce_labels=False, size=(1024, 1024))
 
@@ -159,8 +176,12 @@ if __name__ == "__main__":
     valid_dataloader = DataLoader(valid_dataset, batch_size=8)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("Using device:", device)
 
     model = create_seg_model("b0", "tire6", pretrained=False)
+
+    # 从文件中加载最新一轮的模型
+    load_checkpoint(model, out_weights_path, max_to_save)
 
     criterion = nn.CrossEntropyLoss()
 
@@ -179,7 +200,7 @@ if __name__ == "__main__":
     writer = SummaryWriter(log_dir)
     epoch_iou, epoch_accuracy = [], []
 
-    for epoch in range(100):  # loop over the dataset multiple times
+    for epoch in range(epochs):  # loop over the dataset multiple times
         model.train()
         print("Epoch:", epoch)
         epoch_loss = 0.0
@@ -256,4 +277,4 @@ if __name__ == "__main__":
         writer.add_scalar('Accuracy/val', avg_val_accuracy, epoch)
 
         # 保存模型
-        save_checkpoint(epoch, avg_val_loss, avg_val_iou, avg_val_accuracy, model)
+        save_checkpoint(model, out_weights_path, epoch, avg_val_loss, max_to_save)
