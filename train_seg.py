@@ -93,6 +93,42 @@ class SemanticSegmentationDataset(Dataset):
 
         return encoded_inputs
 
+# 设置保存目录
+out_weights_path = r'assets\checkpoints\tire6'
+# 设置保存模型数量
+max_to_save = 3  # 只保存最后3轮训练的模型
+# 定义用于保存loss和iou的列表
+loss_list = []
+iou_list = []
+
+def save_checkpoint(epoch, avg_val_loss, avg_val_iou, avg_val_accuracy, model):
+    """
+    保存模型并维护保存列表
+    """
+    # 创建模型保存路径
+    model_save_path = os.path.join(out_weights_path, f'model_epoch_{epoch}_loss_{avg_val_loss:.4f}_IoU_{avg_val_iou:.4f}_accuracy_{avg_val_accuracy:.4f}.pth')
+
+    # 保存模型
+    torch.save(model.state_dict(), model_save_path)
+    print(f"Model saved to {model_save_path}")
+    print("Epoch finished:", epoch)
+
+    # 更新loss和iou列表
+    loss_list.append(avg_val_loss)
+    iou_list.append(avg_val_iou)
+
+    # 删除旧的模型，只保留最新的max_to_save个模型
+    if len(loss_list) > max_to_save:
+        # 获取loss最大的模型索引
+        max_loss_index = loss_list.index(max(loss_list))
+
+        # 删除loss最大的模型
+        loss_path = os.path.join(out_weights_path, f'model_epoch_{loss_list.index(max(loss_list))}_loss_{loss_list[max_loss_index]:.4f}_IoU_{iou_list[max_loss_index]:.4f}_accuracy_{avg_val_accuracy:.4f}.pth')
+        os.remove(loss_path)
+
+        # 删除loss最大的模型对应的iou记录
+        del loss_list[max_loss_index]
+        del iou_list[max_loss_index]
 
 if __name__ == "__main__":
 
@@ -219,10 +255,5 @@ if __name__ == "__main__":
         writer.add_scalar('IoU/val', avg_val_iou, epoch)
         writer.add_scalar('Accuracy/val', avg_val_accuracy, epoch)
 
-        # Save model with meaningful naming
-        out_weights_path = r'assets\checkpoints\seg\tire'
-        model_save_path = out_weights_path + f'/model_epoch_{epoch}_loss_{avg_val_loss:.4f}_IoU_{avg_val_iou:.4f}_accuracy_{avg_val_accuracy:.4f}.pth'
-        torch.save(model.state_dict(), model_save_path)
-
-        print(f"Model saved to {model_save_path}")
-        print("Epoch finished:", epoch)
+        # 保存模型
+        save_checkpoint(epoch, avg_val_loss, avg_val_iou, avg_val_accuracy, model)
