@@ -14,3 +14,4 @@ coco/
 demo/gazesam/models/pytorch
 demo/gazesam/models/onnx
 demo/gazesam/models/tensorrt
+tensorboard-output-log-path/*
