@@ -16,7 +16,7 @@ from sklearn.metrics import jaccard_score, accuracy_score
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 
-def compute_metrics(preds, labels, num_classes=7):
+def compute_metrics(preds, labels, num_classes=6):
     preds_flat = preds.flatten()
     labels_flat = labels.flatten()
     iou = jaccard_score(labels_flat, preds_flat, average='macro', labels=range(num_classes))
