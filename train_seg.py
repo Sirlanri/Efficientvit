@@ -129,7 +129,7 @@ def save_checkpoint(model, checkpoint_dir, epoch, avg_val_loss, max_to_save=3):
     保存模型并维护保存列表
     """
     # 创建模型保存路径
-    model_save_path = os.path.join(checkpoint_dir, f'model_epoch_{epoch}_loss_{avg_val_loss:.4f}_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.pth')
+    model_save_path = os.path.join(checkpoint_dir, f'model_epoch_{epoch}_loss_{avg_val_loss:.4f}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pth')
 
     # 保存模型
     torch.save(model.state_dict(), model_save_path)
