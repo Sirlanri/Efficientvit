@@ -112,14 +112,16 @@ def load_checkpoint(model, checkpoint_dir):
     # 获取所有pth文件路径
     checkpoint_files = [os.path.join(checkpoint_dir, f) for f in os.listdir(checkpoint_dir) if f.endswith('.pth')]
 
-    # 按loss排序，并获取最新模型路径
+    # 按epoch排序，并获取最新模型路径
     if checkpoint_files:
         checkpoint_files = sorted(checkpoint_files, key=lambda f: float(f.split('_')[2]))
         latest_checkpoint_path = checkpoint_files[-1]
         print(f"Loading checkpoint from {latest_checkpoint_path}")
-
+        #解析epoch
+        epoch = int(latest_checkpoint_path.split('_')[2])
         # 加载模型
         model.load_state_dict(torch.load(latest_checkpoint_path))
+        return epoch
 
     else:
         print("No checkpoint found. Starting training from scratch.")
@@ -202,7 +204,7 @@ if __name__ == "__main__":
     model = create_seg_model("b0", "tire6", pretrained=False)
 
     # 从文件中加载最新一轮的模型
-    load_checkpoint(model, out_weights_path)
+    start_epoch=load_checkpoint(model, out_weights_path)
 
     criterion = nn.CrossEntropyLoss()
 
@@ -220,7 +222,7 @@ if __name__ == "__main__":
     writer = SummaryWriter(log_dir)
     epoch_iou, epoch_accuracy = [], []
 
-    for epoch in range(epochs):  # loop over the dataset multiple times
+    for epoch in range(start_epoch,epochs):  # loop over the dataset multiple times
         model.train()
         print("Epoch:", epoch)
         epoch_loss = 0.0
