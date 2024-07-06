@@ -105,7 +105,7 @@ class SemanticSegmentationDataset(Dataset):
 
         return encoded_inputs
 
-def load_checkpoint(model, checkpoint_dir):
+def load_checkpoint(model, checkpoint_dir) -> int:
     """
     从文件中加载最新一轮的模型，并维护保存列表
     """
@@ -125,6 +125,7 @@ def load_checkpoint(model, checkpoint_dir):
 
     else:
         print("No checkpoint found. Starting training from scratch.")
+        return 0
 
 import re
 
