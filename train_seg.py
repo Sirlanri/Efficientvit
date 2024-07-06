@@ -105,7 +105,7 @@ class SemanticSegmentationDataset(Dataset):
 
         return encoded_inputs
 
-def load_checkpoint(model, checkpoint_dir, max_to_save=3):
+def load_checkpoint(model, checkpoint_dir):
     """
     从文件中加载最新一轮的模型，并维护保存列表
     """
@@ -124,7 +124,31 @@ def load_checkpoint(model, checkpoint_dir, max_to_save=3):
     else:
         print("No checkpoint found. Starting training from scratch.")
 
-def save_checkpoint(model, checkpoint_dir, epoch, avg_val_loss, max_to_save=3):
+import re
+
+def get_epoch(filename):
+    match = re.search(r"model_epoch_(\d+)_", filename)
+    if match:
+        return int(match.group(1))
+    else:
+        return None
+
+def delete_min_epoch_file(directory):
+    files = os.listdir(directory)
+    epochs = [get_epoch(filename) for filename in files if filename.endswith(".pth")]
+
+    if epochs:
+        min_epoch = min(epochs)
+        for filename in files:
+            if get_epoch(filename) == min_epoch:
+                os.remove(os.path.join(directory, filename))
+                print(f"Deleted file: {filename}")
+                break
+    else:
+        print("No files found in the directory.")
+
+
+def save_checkpoint(model, checkpoint_dir, epoch, avg_val_loss, max_to_save):
     """
     保存模型并维护保存列表
     """
@@ -140,12 +164,9 @@ def save_checkpoint(model, checkpoint_dir, epoch, avg_val_loss, max_to_save=3):
 
     # 删除旧的模型，只保留最新的max_to_save个模型
     if len(loss_list) > max_to_save:
-        # 获取loss最大的模型索引
-        max_loss_index = loss_list.index(max(loss_list))
+        #删除epoch最小的模型
+        delete_min_epoch_file(checkpoint_dir)
 
-        # 删除loss最大的模型
-        loss_path = os.path.join(checkpoint_dir, f'model_epoch_{loss_list.index(max(loss_list))}_loss_{loss_list[max_loss_index]:.4f}.pth')
-        os.remove(loss_path)
 
 
 if __name__ == "__main__":
@@ -181,7 +202,7 @@ if __name__ == "__main__":
     model = create_seg_model("b0", "tire6", pretrained=False)
 
     # 从文件中加载最新一轮的模型
-    load_checkpoint(model, out_weights_path, max_to_save)
+    load_checkpoint(model, out_weights_path)
 
     criterion = nn.CrossEntropyLoss()
 
