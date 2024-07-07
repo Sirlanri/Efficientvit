@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 from efficientvit.seg_model_zoo import create_seg_model
 from sklearn.metrics import jaccard_score, accuracy_score
-os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+#os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 # 参数区
 
