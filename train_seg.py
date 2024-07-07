@@ -27,6 +27,10 @@ max_to_save = 200  # 只保存最后n轮训练的模型
 epochs = 300
 # 定义用于保存loss的列表
 loss_list = []
+# 学习率
+LR=0.06
+#Batch_Size
+Batch_Size=8
 
 def compute_metrics(preds, labels, num_classes=6):
     preds_flat = preds.flatten()
@@ -196,8 +200,8 @@ if __name__ == "__main__":
     valid_dataset = SemanticSegmentationDataset(root_dir=root_dir, image_processor=image_processor, transform=None,
                                                 train=False)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-    valid_dataloader = DataLoader(valid_dataset, batch_size=8)
+    train_dataloader = DataLoader(train_dataset, batch_size=Batch_Size, shuffle=True)
+    valid_dataloader = DataLoader(valid_dataset, batch_size=Batch_Size)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Using device:", device)
@@ -209,7 +213,7 @@ if __name__ == "__main__":
 
     criterion = nn.CrossEntropyLoss()
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=0.0006)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3, factor=0.1, verbose=True)
 
