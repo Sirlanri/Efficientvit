@@ -218,7 +218,7 @@ if __name__ == "__main__":
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3, factor=0.1, verbose=True)
 
-    model=torch.compile(model,mode='max-autotune')
+    #model=torch.compile(model,mode='max-autotune')
     model.to(device)
 
     # TensorBoard setup
