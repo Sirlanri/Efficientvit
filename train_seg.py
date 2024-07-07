@@ -31,6 +31,7 @@ loss_list = []
 LR=0.06
 #Batch_Size
 Batch_Size=8
+TensorBoard_dir=r'tensorboard-log\2'
 
 def compute_metrics(preds, labels, num_classes=6):
     preds_flat = preds.flatten()
@@ -223,7 +224,7 @@ if __name__ == "__main__":
     # TensorBoard setup
     current_time = datetime.now().strftime('%b%d_%H-%M-%S')
     # log_dir = f'/path/to/logs/{current_time}'  # Customize the path as needed
-    log_dir = 'tensorboard-output-log-path'
+    log_dir = TensorBoard_dir
     writer = SummaryWriter(log_dir)
     epoch_iou, epoch_accuracy = [], []
 
