@@ -47,6 +47,9 @@ class SegmentationTransforms:
         self.transforms = transforms.Compose([
             transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5),
             # Add more transformations as needed
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomVerticalFlip(),
+            transforms.RandomRotation(degrees=30),
         ])
 
     def __call__(self, image, mask):
