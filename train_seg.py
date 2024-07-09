@@ -1,3 +1,4 @@
+import sys
 from torch.utils.data import Dataset
 import os
 from PIL import Image
@@ -13,25 +14,15 @@ from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 from efficientvit.seg_model_zoo import create_seg_model
 from sklearn.metrics import jaccard_score, accuracy_score
+
+from train_seg_configs import *
 #os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 # 参数区
 
-root_dir = r'E:\项目数据\轮胎\分割数据集\总数据集\分割格式'
-
-# 设置保存目录
-out_weights_path = r'assets\checkpoints\tire6'
-# 设置保存模型数量
-max_to_save = 200  # 只保存最后n轮训练的模型
-# 设置训练轮数
-epochs = 300
 # 定义用于保存loss的列表
 loss_list = []
-# 学习率
-LR=0.06
-#Batch_Size
-Batch_Size=8
-TensorBoard_dir=r'tensorboard-log\2'
+
 
 def compute_metrics(preds, labels, num_classes=6):
     preds_flat = preds.flatten()
@@ -226,7 +217,12 @@ if __name__ == "__main__":
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3, factor=0.1, verbose=True)
 
-    #model=torch.compile(model,mode='max-autotune')
+    #检查当前系统是否为Linux，如果是，则使用torch.compile
+    if sys.platform.startswith('linux'):
+        print('Current system is Linux, using torch.compile')
+        model=torch.compile(model,mode='max-autotune')
+    else:
+        print('Current system is not Linux, disabled torch.compile')
     model.to(device)
 
     # TensorBoard setup
