@@ -212,6 +212,11 @@ if __name__ == "__main__":
 
     model = create_seg_model("b0", "tire6", pretrained=False)
 
+    #确认路径存在，不存在则创建
+    if not os.path.exists(out_weights_path):
+        os.makedirs(out_weights_path)
+    if not os.path.exists(TensorBoard_dir):
+        os.makedirs(TensorBoard_dir)
     # 从文件中加载最新一轮的模型
     start_epoch=load_checkpoint(model, out_weights_path)
 
