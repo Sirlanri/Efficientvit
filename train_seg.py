@@ -215,7 +215,7 @@ if __name__ == "__main__":
     if not os.path.exists(TensorBoard_dir):
         os.makedirs(TensorBoard_dir)
     # 从文件中加载最新一轮的模型
-    start_epoch=load_checkpoint(model, out_weights_path)
+    start_epoch=load_checkpoint(model, out_weights_path)+1
 
     criterion = nn.CrossEntropyLoss()
 
