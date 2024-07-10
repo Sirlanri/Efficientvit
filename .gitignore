@@ -15,3 +15,6 @@ demo/gazesam/models/pytorch
 demo/gazesam/models/onnx
 demo/gazesam/models/tensorrt
 tensorboard-log/*
+events.out.tfevents.*
+*.pth
+*.out
