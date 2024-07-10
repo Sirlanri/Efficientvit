@@ -8,5 +8,11 @@
 开启了数据增强
 大约在60轮趋于稳定
 
+## 3
+为mask开启了形态变换的数据增强，和images同步
 
+epochs = 150
+LR=0.1
+Batch_Size=80
+Num_workers=8
 
