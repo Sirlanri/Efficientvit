@@ -34,22 +34,28 @@ def compute_metrics(preds, labels, num_classes=6):
 
 class SegmentationTransforms:
     def __init__(self):
-        # Define transformations here
-        self.transforms = transforms.Compose([
-            transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5),
-            # Add more transformations as needed
+        # Define transformations for the source image including ColorJitter
+        self.image_transforms = transforms.Compose([
+            #颜色变换
+            transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5),  # Add ColorJitter only for the image
             transforms.RandomHorizontalFlip(),
             transforms.RandomVerticalFlip(),
             transforms.RandomRotation(degrees=30),
         ])
 
+        # Define transformations for the mask, excluding color-related transformations
+        self.mask_transforms = transforms.Compose([
+            transforms.RandomHorizontalFlip(),  # Ensure the same flips as the image
+            transforms.RandomVerticalFlip(),
+            transforms.RandomRotation(degrees=30),  # Ensure the same rotation as the image
+            # Note: No ColorJitter for the mask
+        ])
+
     def __call__(self, image, mask):
-        # Apply to image
-        image = self.transforms(image)
-
-        # Apply the same transformations to the mask if necessary
-        # For geometric transforms, ensure identical transformations to both image and mask
-
+        # 注：如果发生形态的变化，请确保mask和image的变化一致
+        image = self.image_transforms(image)
+        mask = self.mask_transforms(mask)
+        
         return image, mask
 
 
