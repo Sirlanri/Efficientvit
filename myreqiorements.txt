@@ -1,0 +1,7 @@
+transformers
+scikit-learn
+onnx
+onnxsim
+onnxruntime
+tqdm
+opencv-python
