@@ -18,3 +18,4 @@ tensorboard-log/*
 events.out.tfevents.*
 *.pth
 *.out
+configs/seg/train_seg_configs.py
