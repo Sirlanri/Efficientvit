@@ -201,8 +201,8 @@ if __name__ == "__main__":
     valid_dataset = SemanticSegmentationDataset(root_dir=root_dir, image_processor=image_processor, transform=None,
                                                 train=False)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=Batch_Size, shuffle=True)
-    valid_dataloader = DataLoader(valid_dataset, batch_size=Batch_Size)
+    train_dataloader = DataLoader(train_dataset, batch_size=Batch_Size,num_workers=Num_workers,pin_memory=True, shuffle=True)
+    valid_dataloader = DataLoader(valid_dataset, batch_size=Batch_Size,num_workers=Num_workers,pin_memory=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Using device:", device)
