@@ -226,7 +226,7 @@ if __name__ == "__main__":
     #检查当前系统是否为Linux，如果是，则使用torch.compile
     if sys.platform.startswith('linux'):
         print('Current system is Linux, using torch.compile')
-        model=torch.compile(model,mode='max-autotune')
+        #model=torch.compile(model,mode='max-autotune')
     else:
         print('Current system is not Linux, disabled torch.compile')
     model.to(device)
