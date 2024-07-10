@@ -13,3 +13,4 @@ Batch_Size=8
 #TensorBoard日志目录
 TensorBoard_dir=r'tensorboard-log\3'
 
+Num_workers=4
