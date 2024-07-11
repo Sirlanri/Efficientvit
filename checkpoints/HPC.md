@@ -9,10 +9,14 @@
 大约在60轮趋于稳定
 
 ## 3
-为mask开启了形态变换的数据增强，和images同步
+为mask开启了形态变换的数据增强，和images同步 
+(其实失败了 没同步)
 
 epochs = 150
 LR=0.1
 Batch_Size=80
 Num_workers=8
 
+## 4
+为mask开启了形态变换的数据增强，和images同步
+使用大哥的高质量数据集
