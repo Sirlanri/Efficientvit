@@ -58,6 +58,43 @@ class SegmentationTransforms:
         
         return image, mask
 
+class SegTransforms2:
+    def __init__(self, p_horizontal_flip=0.5, p_vertical_flip=0.5, degrees=45):
+        """
+        初始化方法，设置随机变换的概率和旋转角度范围。
+        
+        :param p_horizontal_flip: 水平翻转的概率，默认为0.5。
+        :param p_vertical_flip: 垂直翻转的概率，默认为0.5。
+        :param degrees: 旋转的角度范围，默认为45度。
+        """
+        self.transforms = transforms.Compose([
+            transforms.RandomHorizontalFlip(p=p_horizontal_flip),
+            transforms.RandomVerticalFlip(p=p_vertical_flip),
+            transforms.RandomRotation(degrees=degrees)
+        ])
+
+    def __call__(self, img, mask):
+        """
+        对图像和掩码应用相同的随机变换，通过先拼接后分离的方式。
+        """
+        # 将图像和掩码转换为张量，并按通道拼接
+        img_tensor = transforms.ToTensor()(img)
+        mask_tensor = transforms.ToTensor()(mask)
+        
+        # 假设图像为RGB，掩码为单通道，拼接成新的张量
+        concatenated_tensor = torch.cat((img_tensor, mask_tensor), dim=0)
+        
+        # 应用变换
+        transformed_concatenated = self.transforms(concatenated_tensor)
+        
+        # 分离变换后的张量回原始的图像和掩码
+        transformed_img = transformed_concatenated[:3, :, :]  # 假设原图是RGB，所以取前3个通道
+        transformed_mask = transformed_concatenated[3:, :, :]  # 掩码是剩下的通道
+        
+        # 转换回PIL.Image格式，如果需要的话
+        transformed_img = transforms.ToPILImage()(transformed_img)
+        transformed_mask = transforms.ToPILImage()(transformed_mask)
+        return transformed_img, transformed_mask
 
 class SemanticSegmentationDataset(Dataset):
     """Image (semantic) segmentation dataset."""
@@ -194,7 +231,7 @@ if __name__ == "__main__":
 
     image_processor = SegformerImageProcessor(reduce_labels=False, size=(1024, 1024))
 
-    transform = SegmentationTransforms()
+    transform = SegTransforms2()
 
     train_dataset = SemanticSegmentationDataset(root_dir=root_dir, image_processor=image_processor, transform=transform,
                                                 train=True)
