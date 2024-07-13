@@ -37,7 +37,10 @@ REGISTERED_SEG_MODEL: dict[str, dict[str, str]] = {
     },
     "tire6":{
         "b0": "assets/checkpoints/tire6/b0.pt",
-    }
+    },
+    "tire12":{
+        "b0": "assets/checkpoints/tire12/b0.pt",
+    },
 }
 
 

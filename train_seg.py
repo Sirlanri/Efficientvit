@@ -14,6 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 from efficientvit.seg_model_zoo import create_seg_model
 from sklearn.metrics import jaccard_score, accuracy_score
+from sklearn.model_selection import KFold
 
 from configs.seg.train_seg_configs import *
 #os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
@@ -24,7 +25,7 @@ from configs.seg.train_seg_configs import *
 loss_list = []
 
 
-def compute_metrics(preds, labels, num_classes=6):
+def compute_metrics(preds, labels, num_classes=12):
     preds_flat = preds.flatten()
     labels_flat = labels.flatten()
     iou = jaccard_score(labels_flat, preds_flat, average='macro', labels=range(num_classes))
@@ -72,6 +73,7 @@ class SegTransforms2:
             transforms.RandomVerticalFlip(p=p_vertical_flip),
             transforms.RandomRotation(degrees=degrees)
         ])
+        self.image_transforms = transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5)
 
     def __call__(self, img, mask):
         """
@@ -146,6 +148,61 @@ class SemanticSegmentationDataset(Dataset):
             encoded_inputs[k].squeeze_()  # remove batch dimension
 
         return encoded_inputs
+
+#能够交叉验证的数据集
+class AutoSemanticSegmentationDataset(Dataset):
+    """Image (semantic) segmentation dataset."""
+
+    def __init__(self,root_dir, image_processor, transform=None, train=True):
+        """
+        重写啦~ 不会手动划分数据集啦
+        Args:
+            root_dir (string): Root directory of the dataset containing the images + masks.
+            image_processor (SegFormerImageProcessor): image processor to prepare images + segmentation maps.
+            train (bool): Whether to load "training" or "validation" images + annotations.
+        """
+        self.root_dir=root_dir
+        self.image_processor = image_processor
+        self.transform = transform
+
+        
+        self.img_dir = os.path.join(self.root_dir, "images")
+        self.mask_dir = os.path.join(self.root_dir, "masks")
+
+        # read images
+        image_file_names = []
+        for root, dirs, files in os.walk(self.img_dir):
+            image_file_names.extend(files)
+        self.images = sorted(image_file_names)
+
+        # read masks
+        mask_file_names = []
+        for root, dirs, files in os.walk(self.mask_dir):
+            mask_file_names.extend(files)
+        self.masks = sorted(mask_file_names)
+
+        assert len(self.images) == len(self.masks), "There must be as many images as there are segmentation maps"
+
+
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx):
+
+        image = Image.open(os.path.join(self.img_dir, self.images[idx])).convert("RGB")
+        segmentation_map = Image.open(os.path.join(self.mask_dir, self.masks[idx])).convert("L")
+        if self.transform:
+            image, segmentation_map = self.transform(image, segmentation_map)
+
+        # randomly crop + pad both image and segmentation map to same size
+        encoded_inputs = self.image_processor(image, segmentation_map, return_tensors="pt")
+
+        for k, v in encoded_inputs.items():
+            encoded_inputs[k].squeeze_()  # remove batch dimension
+
+        return encoded_inputs
+    
 
 def load_checkpoint(model, checkpoint_dir) -> int:
     """
@@ -233,123 +290,133 @@ if __name__ == "__main__":
 
     transform = SegTransforms2()
 
-    train_dataset = SemanticSegmentationDataset(root_dir=root_dir, image_processor=image_processor, transform=transform,
-                                                train=True)
-    valid_dataset = SemanticSegmentationDataset(root_dir=root_dir, image_processor=image_processor, transform=None,
-                                                train=False)
+    #总数据集
+    rootDataset=AutoSemanticSegmentationDataset(root_dir=root_dir, image_processor=image_processor, transform=transform, train=True)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=Batch_Size,num_workers=Num_workers,pin_memory=True, shuffle=True)
-    valid_dataloader = DataLoader(valid_dataset, batch_size=Batch_Size,num_workers=Num_workers,pin_memory=True)
+    #交叉验证
+    kf = KFold(n_splits=N_splits, shuffle=True, random_state=42)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("Using device:", device)
+    for fold, (train_idx, test_idx) in enumerate(kf.split(rootDataset)):
+        print(f" Fold {fold + 1}/{N_splits}")
+        train_sampler = torch.utils.data.SubsetRandomSampler(train_idx)
+        test_sampler = torch.utils.data.SubsetRandomSampler(test_idx)
 
-    model = create_seg_model("b0", "tire6", pretrained=False)
-
-    #确认路径存在，不存在则创建
-    if not os.path.exists(out_weights_path):
-        os.makedirs(out_weights_path)
-    if not os.path.exists(TensorBoard_dir):
-        os.makedirs(TensorBoard_dir)
-    # 从文件中加载最新一轮的模型
-    start_epoch=load_checkpoint(model, out_weights_path)+1
-
-    criterion = nn.CrossEntropyLoss()
-
-    optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
-
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3, factor=0.1, verbose=True)
-
-    #检查当前系统是否为Linux，如果是，则使用torch.compile
-    if sys.platform.startswith('linux'):
-        print('Current system is Linux, using torch.compile')
-        #model=torch.compile(model,mode='max-autotune')
-    else:
-        print('Current system is not Linux, disabled torch.compile')
-    model.to(device)
-
-    # TensorBoard setup
-    current_time = datetime.now().strftime('%b%d_%H-%M-%S')
-    # log_dir = f'/path/to/logs/{current_time}'  # Customize the path as needed
-    log_dir = TensorBoard_dir
-    writer = SummaryWriter(log_dir)
-    epoch_iou, epoch_accuracy = [], []
-
-    for epoch in range(start_epoch,epochs):  # loop over the dataset multiple times
-        model.train()
-        print("Epoch:", epoch)
-        epoch_loss = 0.0
-        ious, accuracies = [], []
-
-        for idx, batch in enumerate(tqdm(train_dataloader)):
-            # get the inputs;
-            pixel_values = batch["pixel_values"].to(device)
-            labels = batch["labels"].to(device)
-
-            optimizer.zero_grad()
-
-            outputs = model(pixel_values)
-
-            upsampled_outputs = nn.functional.interpolate(
-                outputs, size=labels.shape[-2:], mode="bilinear", align_corners=False
-            )
-
-            loss = criterion(upsampled_outputs, labels)
-            loss.backward()
-            optimizer.step()
-
-            epoch_loss += loss.item()
+        train_dataloader = DataLoader(train_sampler, batch_size=Batch_Size,num_workers=Num_workers,pin_memory=True, shuffle=True)
+        valid_dataloader = DataLoader(test_sampler, batch_size=Batch_Size,num_workers=Num_workers,pin_memory=True)
 
 
-        # Log and print epoch metrics
-        avg_epoch_loss = epoch_loss / len(train_dataloader)
-        writer.add_scalar('Loss/train', avg_epoch_loss, epoch)
+        train_dataloader = DataLoader(rootDataset, sampler=train_sampler,batch_size=Batch_Size,num_workers=Num_workers,pin_memory=True)
+        valid_dataloader = DataLoader(rootDataset, sampler=test_sampler,batch_size=Batch_Size,num_workers=Num_workers,pin_memory=True)
 
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print("Using device:", device)
 
-        # Update learning rate
-        scheduler.step(avg_epoch_loss)
+        model = create_seg_model("b0", "tire12", pretrained=False)
 
-        print(
-            f"Epoch {epoch} finished: Avg Loss = {avg_epoch_loss:.4f}")
+        #确认路径存在，不存在则创建
+        if not os.path.exists(out_weights_path):
+            os.makedirs(out_weights_path)
+        if not os.path.exists(TensorBoard_dir):
+            os.makedirs(TensorBoard_dir)
+        # 从文件中加载最新一轮的模型
+        start_epoch=load_checkpoint(model, out_weights_path)+1
 
-        # Log learning rate
-        current_lr = optimizer.param_groups[0]['lr']
-        writer.add_scalar('Learning Rate', current_lr, epoch)
+        criterion = nn.CrossEntropyLoss()
 
-        # Validation phase
-        model.eval()
-        val_loss = 0.0
-        val_ious, val_accuracies = [], []
-        with torch.no_grad():
-            for batch in valid_dataloader:
+        optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
+
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3, factor=0.1, verbose=True)
+
+        #检查当前系统是否为Linux，如果是，则使用torch.compile
+        if sys.platform.startswith('linux'):
+            print('Current system is Linux, using torch.compile')
+            #model=torch.compile(model,mode='max-autotune')
+        else:
+            print('Current system is not Linux, disabled torch.compile')
+        model.to(device)
+
+        # TensorBoard setup
+        current_time = datetime.now().strftime('%b%d_%H-%M-%S')
+        # log_dir = f'/path/to/logs/{current_time}'  # Customize the path as needed
+        log_dir = TensorBoard_dir
+        writer = SummaryWriter(log_dir)
+        epoch_iou, epoch_accuracy = [], []
+
+        for epoch in range(start_epoch,epochs):  # loop over the dataset multiple times
+            model.train()
+            print("Epoch:", epoch)
+            epoch_loss = 0.0
+            ious, accuracies = [], []
+
+            for idx, batch in enumerate(tqdm(train_dataloader)):
+                # get the inputs;
                 pixel_values = batch["pixel_values"].to(device)
                 labels = batch["labels"].to(device)
+
+                optimizer.zero_grad()
+
                 outputs = model(pixel_values)
+
                 upsampled_outputs = nn.functional.interpolate(
                     outputs, size=labels.shape[-2:], mode="bilinear", align_corners=False
                 )
 
                 loss = criterion(upsampled_outputs, labels)
+                loss.backward()
+                optimizer.step()
 
-                val_loss += loss.item()
+                epoch_loss += loss.item()
 
-                predicted = upsampled_outputs.argmax(dim=1)
 
-                batch_iou, batch_accuracy = compute_metrics(predicted.cpu().numpy(), labels.cpu().numpy())
-                val_ious.append(batch_iou)
-                val_accuracies.append(batch_accuracy)
+            # Log and print epoch metrics
+            avg_epoch_loss = epoch_loss / len(train_dataloader)
+            writer.add_scalar('Loss/train', avg_epoch_loss, epoch)
 
-        # Calculate and print average validation loss and metrics
-        avg_val_loss = val_loss / len(valid_dataloader)
-        avg_val_iou = sum(val_ious) / len(val_ious)
-        avg_val_accuracy = sum(val_accuracies) / len(val_accuracies)
-        print(
-            f"Validation - Avg Loss: {avg_val_loss:.4f}, Avg IoU: {avg_val_iou:.4f}, Avg Accuracy: {avg_val_accuracy:.4f}")
 
-        # Log validation metrics
-        writer.add_scalar('Loss/val', avg_val_loss, epoch)
-        writer.add_scalar('IoU/val', avg_val_iou, epoch)
-        writer.add_scalar('Accuracy/val', avg_val_accuracy, epoch)
+            # Update learning rate
+            scheduler.step(avg_epoch_loss)
 
-        # 保存模型
-        save_checkpoint(model, out_weights_path, epoch, avg_val_loss, max_to_save)
+            print(
+                f"Epoch {epoch} finished: Avg Loss = {avg_epoch_loss:.4f}")
+
+            # Log learning rate
+            current_lr = optimizer.param_groups[0]['lr']
+            writer.add_scalar('Learning Rate', current_lr, epoch)
+
+            # Validation phase
+            model.eval()
+            val_loss = 0.0
+            val_ious, val_accuracies = [], []
+            with torch.no_grad():
+                for batch in valid_dataloader:
+                    pixel_values = batch["pixel_values"].to(device)
+                    labels = batch["labels"].to(device)
+                    outputs = model(pixel_values)
+                    upsampled_outputs = nn.functional.interpolate(
+                        outputs, size=labels.shape[-2:], mode="bilinear", align_corners=False
+                    )
+
+                    loss = criterion(upsampled_outputs, labels)
+
+                    val_loss += loss.item()
+
+                    predicted = upsampled_outputs.argmax(dim=1)
+
+                    batch_iou, batch_accuracy = compute_metrics(predicted.cpu().numpy(), labels.cpu().numpy())
+                    val_ious.append(batch_iou)
+                    val_accuracies.append(batch_accuracy)
+
+            # Calculate and print average validation loss and metrics
+            avg_val_loss = val_loss / len(valid_dataloader)
+            avg_val_iou = sum(val_ious) / len(val_ious)
+            avg_val_accuracy = sum(val_accuracies) / len(val_accuracies)
+            print(
+                f"Validation - Avg Loss: {avg_val_loss:.4f}, Avg IoU: {avg_val_iou:.4f}, Avg Accuracy: {avg_val_accuracy:.4f}")
+
+            # Log validation metrics
+            writer.add_scalar('Loss/val', avg_val_loss, epoch)
+            writer.add_scalar('IoU/val', avg_val_iou, epoch)
+            writer.add_scalar('Accuracy/val', avg_val_accuracy, epoch)
+
+            # 保存模型
+            save_checkpoint(model, out_weights_path, epoch, avg_val_loss, max_to_save)
