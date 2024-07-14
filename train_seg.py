@@ -288,7 +288,7 @@ if __name__ == "__main__":
 
     image_processor = SegformerImageProcessor(reduce_labels=False, size=(1024, 1024))
 
-    transform = SegTransforms2()
+    transform = None
 
     #总数据集
     rootDataset=AutoSemanticSegmentationDataset(root_dir=root_dir, image_processor=image_processor, transform=transform, train=True)
