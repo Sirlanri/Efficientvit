@@ -311,7 +311,7 @@ if __name__ == "__main__":
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print("Using device:", device)
 
-        model = create_seg_model("b0", "tire12", pretrained=False)
+        model = create_seg_model(Model_size, "tire12", pretrained=False)
 
         #确认路径存在，不存在则创建
         if not os.path.exists(out_weights_path):

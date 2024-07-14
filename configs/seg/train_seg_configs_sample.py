@@ -21,3 +21,7 @@ epochs = 130
 LR=0.06
 Batch_Size=8
 Num_workers=6
+#K折交叉验证
+N_splits=5
+#模型的大小
+Model_size='b0'
