@@ -24,7 +24,6 @@ from configs.seg.train_seg_configs import *
 # 定义用于保存loss的列表
 loss_list = []
 
-
 def compute_metrics(preds, labels, num_classes=12):
     preds_flat = preds.flatten()
     labels_flat = labels.flatten()
@@ -348,7 +347,7 @@ if __name__ == "__main__":
             epoch_loss = 0.0
             ious, accuracies = [], []
 
-            for idx, batch in enumerate(tqdm(train_dataloader)):
+            for idx, batch in enumerate(tqdm(train_dataloader,desc="Training")):
                 # get the inputs;
                 pixel_values = batch["pixel_values"].to(device)
                 labels = batch["labels"].to(device)
@@ -388,7 +387,7 @@ if __name__ == "__main__":
             val_loss = 0.0
             val_ious, val_accuracies = [], []
             with torch.no_grad():
-                for batch in valid_dataloader:
+                for idx, batch in enumerate(tqdm(valid_dataloader,desc="Validating")):
                     pixel_values = batch["pixel_values"].to(device)
                     labels = batch["labels"].to(device)
                     outputs = model(pixel_values)
@@ -401,22 +400,24 @@ if __name__ == "__main__":
                     val_loss += loss.item()
 
                     predicted = upsampled_outputs.argmax(dim=1)
-
-                    batch_iou, batch_accuracy = compute_metrics(predicted.cpu().numpy(), labels.cpu().numpy())
-                    val_ious.append(batch_iou)
-                    val_accuracies.append(batch_accuracy)
+                    if IS_IOU_ACC:
+                        batch_iou, batch_accuracy = compute_metrics(predicted.cpu().numpy(), labels.cpu().numpy())
+                        val_ious.append(batch_iou)
+                        val_accuracies.append(batch_accuracy)
 
             # Calculate and print average validation loss and metrics
             avg_val_loss = val_loss / len(valid_dataloader)
-            avg_val_iou = sum(val_ious) / len(val_ious)
-            avg_val_accuracy = sum(val_accuracies) / len(val_accuracies)
-            print(
-                f"Validation - Avg Loss: {avg_val_loss:.4f}, Avg IoU: {avg_val_iou:.4f}, Avg Accuracy: {avg_val_accuracy:.4f}")
+            if IS_IOU_ACC:
+                avg_val_iou = sum(val_ious) / len(val_ious)
+                avg_val_accuracy = sum(val_accuracies) / len(val_accuracies)
+                print(f"Validation Avg IoU: {avg_val_iou:.4f}, Avg Accuracy: {avg_val_accuracy:.4f}")
+                writer.add_scalar('IoU/val', avg_val_iou, epoch)
+                writer.add_scalar('Accuracy/val', avg_val_accuracy, epoch)
 
+            print(f"Validation - Avg Loss: {avg_val_loss:.4f}")
             # Log validation metrics
             writer.add_scalar('Loss/val', avg_val_loss, epoch)
-            writer.add_scalar('IoU/val', avg_val_iou, epoch)
-            writer.add_scalar('Accuracy/val', avg_val_accuracy, epoch)
+            
 
             # 保存模型
             save_checkpoint(model, out_weights_path, epoch, avg_val_loss, max_to_save)

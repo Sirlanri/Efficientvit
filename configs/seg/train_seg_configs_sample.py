@@ -25,3 +25,5 @@ Num_workers=6
 N_splits=5
 #模型的大小
 Model_size='b0'
+#是否开启耗时的IOU和ACC计算
+IS_IOU_ACC=False
