@@ -17,6 +17,15 @@ LR=0.1
 Batch_Size=80
 Num_workers=8
 
-## 4
+## 4 （取消
 为mask开启了形态变换的数据增强，和images同步
 使用大哥的高质量数据集
+
+## 6
+12边界分割
+使用b2模型
+
+## 7
+
+12边界 使用b0模型
+IS_IOU_ACC=False
