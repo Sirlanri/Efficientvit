@@ -27,5 +27,10 @@ Num_workers=8
 
 ## 7
 
-12边界 使用b0模型
+12边界 使用b0模型，增广后的数据集
 IS_IOU_ACC=False
+tire-seg-6.1
+
+## 8
+12 边界 b0模型 使用源数据集，pytorch增广
+tire-seg-6.2
