@@ -17,6 +17,7 @@ from sklearn.metrics import jaccard_score, accuracy_score
 from sklearn.model_selection import KFold
 
 from configs.seg.train_seg_configs import *
+from efficientvit.tools.early_stopping import EarlyStopping
 #os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 # 参数区
@@ -326,6 +327,9 @@ if __name__ == "__main__":
 
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3, factor=0.1, verbose=True)
 
+        #初始化早停机制
+        early_stopping = EarlyStopping()
+
         #检查当前系统是否为Linux，如果是，则使用torch.compile
         if sys.platform.startswith('linux'):
             print('Current system is Linux, using torch.compile')
@@ -418,6 +422,12 @@ if __name__ == "__main__":
             # Log validation metrics
             writer.add_scalar('Loss/val', avg_val_loss, epoch)
             
-
+            #应用早停
+            early_stopping(avg_val_loss)
+            if early_stopping.early_stop:
+                print("Early stopping")
+                break
+            
             # 保存模型
             save_checkpoint(model, out_weights_path, epoch, avg_val_loss, max_to_save)
+            
