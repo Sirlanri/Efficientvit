@@ -27,3 +27,7 @@ N_splits=5
 Model_size='b0'
 #是否开启耗时的IOU和ACC计算
 IS_IOU_ACC=False
+#早停策略 val loss没有提升的次数
+Patient_Num=10
+#早停策略 val loss 平滑程度
+Std_Smooth=0.05

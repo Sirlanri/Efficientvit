@@ -1,4 +1,5 @@
 import numpy as np
+from configs.seg.train_seg_configs import *
 
 #早停机制
 class EarlyStopping:
@@ -19,17 +20,30 @@ class EarlyStopping:
         self.early_stop = False
         self.val_loss_min = np.Inf
         self.delta = delta
+        self.lossArray:list[float]=[]
+
+    #检验loss数组的数据是否平滑
+    def isSmooth(self) -> bool:
+        stdnum=np.std(self.lossArray)
+        if stdnum<Std_Smooth:
+            return True
+        else:
+            return False
 
     def __call__(self, val_loss):
 
         score = -val_loss
 
+        if len(self.lossArray)>=self.patience:
+            self.lossArray.pop(0)
+        self.lossArray.append(val_loss)
+
         if self.best_score is None:
             self.best_score = score
         elif score < self.best_score + self.delta:
             self.counter += 1
-            print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
-            if self.counter >= self.patience:
+            print(f'EarlyStopping counter: {self.counter} out of {self.patience}, Smooth= {np.std(self.lossArray)}')
+            if self.counter >= self.patience and self.isSmooth():
                 self.early_stop = True
         else:
             self.best_score = score
